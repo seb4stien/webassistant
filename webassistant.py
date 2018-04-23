@@ -2,7 +2,7 @@
 import os
 import re
 import requests
-from datetime import datetime
+import time
 
 # dependencies
 from flask import Flask, request
@@ -14,6 +14,25 @@ from myconfig import LOG_PATH, TTS_URL, sensors, playlist
 #import beets.library
 
 #lib = beets.library.Library("/root/.config/beets/newlib.db")
+
+
+def parse_sensor(line):
+    res = {
+        'temp': None,
+        'age': None
+    }
+
+    m = re.match(".*temp: (-?\d+\.\d+)", line)
+
+    if m:
+        res['temp'] = m.groups()[0].replace(".", ",")
+
+    m = re.match(".*ts: (\d+)", line)
+    if m:
+        ts = int(m.groups()[0])
+        res['age'] = int(time.time()) - ts
+
+    return res
 
 
 def get_temp(room):
@@ -30,18 +49,9 @@ def get_temp(room):
 
     with open(log_filename, "r") as fh:
         last_line = fh.readlines()[-1]
-        m = re.match(".*temp: (-?\d+\.\d+)", last_line)
-
-        if m:
-            temp = m.groups()[0].replace(".", ",")
-        else:
-            temp = "inconnu"
-
-        m = re.match(".*ts: (\d+)", last_line)
-        if m:
-            age = (datetime.now() - datetime.fromtimestamp(int(m.groups()[0]))).seconds // 60
-        else:
-            age = "inconnu"
+        sensor_dict = parse_sensor(last_line)
+        temp = sensor_dict['temp']
+        age = sensor_dict['age']
 
     return (temp, age, comment)
 
@@ -82,7 +92,7 @@ def temp(room):
     (temp, age, comment) = get_temp(room)
 
     if age > -1:
-        text = "Il y a %s minutes il faisait %s degrés %s" % (age, temp, comment)
+        text = "Il y a %s secondes il faisait %s degrés %s" % (age, temp, comment)
     else:
         text = comment
 
